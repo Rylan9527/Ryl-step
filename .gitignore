@@ -1,0 +1,21 @@
+# 敏感文件
+config.json
+secret.key
+mimotion.db
+encrypted_tokens.data
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# 日志
+sync.log
+cron_change_time
+
+# IDE
+.vscode/
+.idea/

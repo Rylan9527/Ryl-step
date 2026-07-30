@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% block title %}自动任务管理{% endblock %}
+{% block page_title %}自动任务管理{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#taskModal" onclick="openAdd()">
+      <i class="bi bi-plus-lg"></i> 新增自动任务
+    </button>
+    <button class="btn btn-outline-secondary" onclick="loadTasks()">
+      <i class="bi bi-arrow-clockwise"></i> 刷新
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>账号</th>
+            <th>目标步数</th>
+            <th>执行时间</th>
+            <th>状态</th>
+            <th>最近同步</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="taskTable">
+          <tr><td colspan="6" class="text-center text-muted py-4">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑任务弹窗 -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">新增自动任务（Zepp Life 刷步）</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="taskId">
+        <div class="mb-3">
+          <label class="form-label">Zepp Life 账号 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="username" placeholder="邮箱或手机号（原小米运动）">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">密码 <span class="text-danger">*</span></label>
+          <input type="password" class="form-control" id="password" placeholder="账号密码">
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">最小步数 <span class="text-danger">*</span></label>
+            <input type="number" class="form-control" id="stepsMin" placeholder="如 15000">
+          </div>
+          <div class="col">
+            <label class="form-label">最大步数</label>
+            <input type="number" class="form-control" id="stepsMax" placeholder="留空=固定步数">
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">执行时间(小时)</label>
+            <input type="text" class="form-control" id="execHours" placeholder="如 8,12,18" value="8">
+            <small class="text-muted">逗号分隔的小时数，每天执行</small>
+          </div>
+          <div class="col">
+            <label class="form-label">分钟</label>
+            <input type="number" class="form-control" id="execMinute" value="0" min="0" max="59">
+          </div>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="enabled" checked>
+          <label class="form-check-label" for="enabled">立即启用</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="saveTask()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="position-fixed top-0 end-0 p-3" style="z-index:9999"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadTasks() {
+  const res = await fetch('/api/auto/tasks');
+  const tasks = await res.json();
+  const tbody = document.getElementById('taskTable');
+  if (!tasks.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无自动任务</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tasks.map(t => `
+    <tr>
+      <td>${t.username}</td>
+      <td>${t.steps_max ? t.steps_min + ' ~ ' + t.steps_max : t.steps_min + ' (固定)'}</td>
+      <td>每天 ${t.exec_hours} 点 / ${t.exec_minute}分</td>
+      <td>
+        <span class="badge ${t.enabled ? 'badge-success' : 'badge-secondary'}">${t.enabled ? '启用' : '停用'}</span>
+        ${t.last_sync_status ? `<span class="badge ${t.last_sync_status=='success'?'badge-success':'badge-danger'} ms-1">${t.last_sync_status=='success'?'成功':'失败'}</span>` : ''}
+      </td>
+      <td>${t.last_sync_time || '-'}</td>
+      <td>
+        <button class="btn btn-sm btn-outline-primary" onclick="runNow(${t.id})" title="立即执行"><i class="bi bi-play"></i></button>
+        <button class="btn btn-sm btn-outline-warning" onclick="toggleTask(${t.id})" title="启用/停用"><i class="bi bi-power"></i></button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="openEdit(${t.id})" title="编辑"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${t.id})" title="删除"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+function openAdd() {
+  document.getElementById('modalTitle').textContent = '新增自动任务';
+  document.getElementById('taskId').value = '';
+  document.getElementById('username').value = '';
+  document.getElementById('username').disabled = false;
+  document.getElementById('password').value = '';
+  document.getElementById('password').placeholder = '账号密码';
+  document.getElementById('stepsMin').value = '';
+  document.getElementById('stepsMax').value = '';
+  document.getElementById('execHours').value = '8';
+  document.getElementById('execMinute').value = '0';
+  document.getElementById('enabled').checked = true;
+}
+
+async function openEdit(id) {
+  const res = await fetch('/api/auto/tasks');
+  const tasks = await res.json();
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('modalTitle').textContent = '编辑自动任务（Zepp Life 刷步）';
+  document.getElementById('taskId').value = t.id;
+  // 编辑时账号显示但不修改（脱敏），密码留空表示不修改
+  document.getElementById('username').value = t.username;
+  document.getElementById('username').disabled = true;
+  document.getElementById('password').value = '';
+  document.getElementById('password').placeholder = '留空则不修改密码';
+  document.getElementById('stepsMin').value = t.steps_min;
+  document.getElementById('stepsMax').value = t.steps_max || '';
+  document.getElementById('execHours').value = t.exec_hours;
+  document.getElementById('execMinute').value = t.exec_minute;
+  document.getElementById('enabled').checked = t.enabled;
+  new bootstrap.Modal(document.getElementById('taskModal')).show();
+}
+
+async function saveTask() {
+  const id = document.getElementById('taskId').value;
+  const body = {
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+    steps_min: document.getElementById('stepsMin').value,
+    steps_max: document.getElementById('stepsMax').value,
+    exec_hours: document.getElementById('execHours').value,
+    exec_minute: document.getElementById('execMinute').value,
+    enabled: document.getElementById('enabled').checked
+  };
+  const url = id ? '/api/auto/tasks/' + id : '/api/auto/tasks';
+  const method = id ? 'PUT' : 'POST';
+  const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const data = await res.json();
+  showToast(data.message, data.success);
+  if (data.success) {
+    bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+    loadTasks();
+  }
+}
+
+async function toggleTask(id) {
+  const res = await fetch('/api/auto/tasks/' + id + '/toggle', { method: 'POST' });
+  const data = await res.json();
+  showToast(data.message, data.success);
+  loadTasks();
+}
+
+async function runNow(id) {
+  if (!confirm('确认立即执行该任务？')) return;
+  showToast('正在执行...', true);
+  const res = await fetch('/api/auto/tasks/' + id + '/run', { method: 'POST' });
+  const data = await res.json();
+  showToast(data.message, data.success);
+  loadTasks();
+}
+
+async function deleteTask(id) {
+  if (!confirm('确认删除该任务？')) return;
+  const res = await fetch('/api/auto/tasks/' + id, { method: 'DELETE' });
+  const data = await res.json();
+  showToast(data.message, data.success);
+  loadTasks();
+}
+
+function showToast(msg, success) {
+  const el = document.getElementById('toast');
+  el.innerHTML = `<div class="toast show align-items-center text-white ${success?'bg-success':'bg-danger'}" role="alert">
+    <div class="d-flex"><div class="toast-body">${msg}</div>
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest('.toast').remove()"></button></div></div>`;
+  setTimeout(() => el.innerHTML = '', 4000);
+}
+
+loadTasks();
+</script>
+{% endblock %}

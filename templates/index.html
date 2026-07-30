@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>动动吗 - 更新您的运动步数数据</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f2f2f7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .header-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .header-icon {
+      width: 28px;
+      height: 28px;
+      color: #1a1a1a;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .header-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a1a;
+      line-height: 1.3;
+    }
+    .header-subtitle {
+      font-size: 13px;
+      color: #8e8e93;
+      margin-top: 2px;
+    }
+    .api-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f2f2f7;
+      border-radius: 16px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #34c759;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .api-status-dot {
+      width: 8px;
+      height: 8px;
+      background: #34c759;
+      border-radius: 50%;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    .form-label svg {
+      width: 16px;
+      height: 16px;
+      color: #1a1a1a;
+    }
+    .form-label .info-icon {
+      width: 14px;
+      height: 14px;
+      color: #c7c7cc;
+      cursor: pointer;
+      margin-left: 2px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 15px;
+      color: #1a1a1a;
+      background: #f5f5f5;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .form-input::placeholder {
+      color: #c7c7cc;
+    }
+    .form-input:focus {
+      background: #fff;
+      border-color: #007aff;
+    }
+    .step-input-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .step-number-input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 15px;
+      color: #1a1a1a;
+      background: #f5f5f5;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .step-number-input:focus {
+      background: #fff;
+      border-color: #007aff;
+    }
+    /* 隐藏数字输入框的上下箭头（Webkit） */
+    .step-number-input::-webkit-outer-spin-button,
+    .step-number-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .step-number-input[type=number] {
+      -moz-appearance: textfield;
+    }
+    .slider-container {
+      padding: 0 2px;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border: 2px solid #1a1a1a;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border: 2px solid #1a1a1a;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #8e8e93;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+      background: #1a1a1a;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .submit-btn:hover {
+      opacity: 0.9;
+    }
+    .submit-btn:active {
+      transform: scale(0.98);
+    }
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .submit-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+    .result-msg {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .result-msg.success {
+      display: flex;
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .result-msg.error {
+      display: flex;
+      background: #ffebee;
+      color: #c62828;
+    }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-left">
+        <!-- 跑步图标 -->
+        <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="13.5" cy="4.5" r="2.5"/>
+          <path d="M11 9l-3 5.5L7 18"/>
+          <path d="M16 9l3 5.5 1 3.5"/>
+          <path d="M13 9v6"/>
+          <path d="M8 20h3l2-3 2 3h3"/>
+        </svg>
+        <div>
+          <div class="header-title">动动吗</div>
+          <div class="header-subtitle">更新您的运动步数数据</div>
+        </div>
+      </div>
+      <div class="api-status">
+        <span class="api-status-dot"></span>
+        <span>API在线</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <!-- 人形图标 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        账号
+      </div>
+      <input type="text" class="form-input" id="user" placeholder="请输入账号">
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <!-- 锁图标 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        密码
+      </div>
+      <input type="password" class="form-input" id="pwd" placeholder="请输入密码">
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <!-- 跑步小图标 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="13.5" cy="4.5" r="2.5"/>
+          <path d="M11 9l-3 5.5L7 18"/>
+          <path d="M16 9l3 5.5 1 3.5"/>
+          <path d="M13 9v6"/>
+          <path d="M8 20h3l2-3 2 3h3"/>
+        </svg>
+        步数
+        <!-- 信息图标 -->
+        <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="手动设置步数，范围 1~98800">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      </div>
+      <div class="step-input-row">
+        <input type="number" class="step-number-input" id="stepInput" value="54188" min="1" max="98800">
+      </div>
+      <div class="slider-container">
+        <input type="range" id="stepSlider" min="1" max="98800" value="54188">
+        <div class="slider-labels">
+          <span>1</span>
+          <span>98,800</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn">
+      <!-- 刷新图标 -->
+      <svg id="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      <span id="btnText">动动吧</span>
+    </button>
+
+    <div class="result-msg" id="resultMsg"></div>
+  </div>
+
+  <script>
+    const stepInput = document.getElementById('stepInput');
+    const stepSlider = document.getElementById('stepSlider');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const resultMsg = document.getElementById('resultMsg');
+    const userInput = document.getElementById('user');
+    const pwdInput = document.getElementById('pwd');
+
+    // 滑块与数字输入框双向绑定
+    stepSlider.addEventListener('input', function() {
+      stepInput.value = this.value;
+    });
+    stepInput.addEventListener('input', function() {
+      let val = parseInt(this.value) || 0;
+      if (val < 1) val = 1;
+      if (val > 98800) val = 98800;
+      stepSlider.value = val;
+    });
+    stepInput.addEventListener('blur', function() {
+      let val = parseInt(this.value) || 1;
+      if (val < 1) val = 1;
+      if (val > 98800) val = 98800;
+      this.value = val;
+      stepSlider.value = val;
+    });
+
+    submitBtn.addEventListener('click', async function() {
+      const user = userInput.value.trim();
+      const pwd = pwdInput.value.trim();
+      const step = parseInt(stepInput.value) || 0;
+
+      if (!user) {
+        showResult('请输入账号', 'error');
+        return;
+      }
+      if (!pwd) {
+        showResult('请输入密码', 'error');
+        return;
+      }
+      if (step < 1 || step > 98800) {
+        showResult('步数范围应在 1~98800 之间', 'error');
+        return;
+      }
+
+      setLoading(true);
+      resultMsg.className = 'result-msg';
+      resultMsg.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/sync-step', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user, pwd, step })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showResult(data.message, 'success');
+        } else {
+          showResult(data.message, 'error');
+        }
+      } catch (err) {
+        showResult('请求失败: ' + err.message, 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    function showResult(msg, type) {
+      resultMsg.textContent = msg;
+      resultMsg.className = 'result-msg ' + type;
+      resultMsg.style.display = 'flex';
+    }
+
+    function setLoading(loading) {
+      submitBtn.disabled = loading;
+      if (loading) {
+        btnText.textContent = '提交中...';
+        btnIcon.outerHTML = '<div class="spinner" id="btnIcon"></div>';
+      } else {
+        btnText.textContent = '动动吧';
+        document.getElementById('btnIcon').outerHTML =
+          '<svg id="btnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+      }
+    }
+  </script>
+</body>
+</html>
