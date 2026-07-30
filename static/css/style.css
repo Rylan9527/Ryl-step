@@ -9,6 +9,8 @@
   z-index: 1000;
   transition: transform 0.3s;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .sidebar-header {
   padding: 20px 18px;
@@ -19,7 +21,7 @@
   display: flex; align-items: center; gap: 10px;
 }
 .sidebar-header i { font-size: 22px; color: #5c6bc0; }
-.nav-menu { padding: 12px 0; }
+.nav-menu { padding: 12px 0; flex: 1; }
 .nav-menu .nav-link {
   color: #9fa8da;
   padding: 12px 20px;
@@ -69,3 +71,37 @@
 /* 表格 */
 .table th { font-weight: 600; color: #555; background: #fafafa; }
 .table td { vertical-align: middle; }
+/* 侧边栏底部用户信息 */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 18px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c5cae9;
+  font-size: 14px;
+}
+.user-info i { font-size: 20px; color: #5c6bc0; }
+.user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 下拉菜单调整 */
+.dropdown-menu {
+  border: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 8px;
+  min-width: 180px;
+}
+.dropdown-item {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+.dropdown-item i {
+  width: 18px;
+  text-align: center;
+}

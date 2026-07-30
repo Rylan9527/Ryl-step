@@ -38,6 +38,13 @@ def init_db():
         last_sync_time TEXT,
         FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_encrypted TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS sync_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER,
@@ -191,6 +198,60 @@ def list_sync_history(username=None, status=None, date_from=None, date_to=None, 
                         params + [per_page, offset]).fetchall()
     conn.close()
     return rows, total
+
+
+# ---------------- users ----------------
+def add_user(username, encrypted_pwd, role='user'):
+    """新增用户，若已存在则更新密码"""
+    conn = get_conn()
+    cur = conn.cursor()
+    existing = cur.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if existing:
+        cur.execute("UPDATE users SET password_encrypted=? WHERE id=?", (encrypted_pwd, existing['id']))
+        conn.commit()
+        user_id = existing['id']
+    else:
+        cur.execute("INSERT INTO users(username, password_encrypted, role) VALUES(?,?,?)",
+                    (username, encrypted_pwd, role))
+        conn.commit()
+        user_id = cur.lastrowid
+    conn.close()
+    return user_id
+
+
+def get_user(username):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+    return row
+
+
+def get_user_by_id(user_id):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def list_users():
+    conn = get_conn()
+    rows = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY id").fetchall()
+    conn.close()
+    return rows
+
+
+def update_user_password(username, encrypted_pwd):
+    conn = get_conn()
+    conn.execute("UPDATE users SET password_encrypted=? WHERE username=?", (encrypted_pwd, username))
+    conn.commit()
+    conn.close()
+
+
+def delete_user(user_id):
+    conn = get_conn()
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
 
 
 # ---------------- 工具函数 ----------------

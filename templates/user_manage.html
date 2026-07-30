@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% block title %}用户管理{% endblock %}
+{% block page_title %}用户管理{% endblock %}
+
+{% block content %}
+{% if request.args.get('msg') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ request.args.get('msg') }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <button class="btn btn-primary" id="btnAddUser">
+    <i class="bi bi-person-plus"></i> 新增用户
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>账号</th>
+            <th>角色</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="userTable">
+          {% for u in users %}
+          <tr>
+            <td>{{ u['id'] }}</td>
+            <td>{{ u['username'] }}</td>
+            <td>
+              {% if u['role'] == 'admin' %}
+              <span class="badge badge-warning">管理员</span>
+              {% else %}
+              <span class="badge badge-info">普通用户</span>
+              {% endif %}
+            </td>
+            <td>{{ u['created_at'] }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-warning" data-act="reset" data-id="{{ u['id'] }}" title="重置密码">
+                <i class="bi bi-key"></i>
+              </button>
+              {% if u['id'] != current_user.id %}
+              <button class="btn btn-sm btn-outline-danger" data-act="delete" data-id="{{ u['id'] }}" title="删除">
+                <i class="bi bi-trash"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 新增用户弹窗 -->
+<div class="modal fade" id="userModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="userModalTitle">新增用户</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="userId">
+        <div class="mb-3">
+          <label class="form-label">账号 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="userUsername" placeholder="请输入账号">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">密码 <span class="text-danger">*</span></label>
+          <input type="password" class="form-control" id="userPassword" placeholder="至少6位">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">角色</label>
+          <select class="form-select" id="userRole">
+            <option value="user">普通用户</option>
+            <option value="admin">管理员</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="btnSaveUser">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 重置密码弹窗 -->
+<div class="modal fade" id="resetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">重置密码</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resetUserId">
+        <div class="mb-3">
+          <label class="form-label">新密码 <span class="text-danger">*</span></label>
+          <input type="password" class="form-control" id="resetPassword" placeholder="至少6位">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">确认密码 <span class="text-danger">*</span></label>
+          <input type="password" class="form-control" id="resetPasswordConfirm" placeholder="再次输入新密码">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="btnResetPassword">确认重置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="position-fixed top-0 end-0 p-3" style="z-index:9999"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // 新增用户
+  document.getElementById('btnAddUser').addEventListener('click', function() {
+    document.getElementById('userModalTitle').textContent = '新增用户';
+    document.getElementById('userUsername').value = '';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userRole').value = 'user';
+    new bootstrap.Modal(document.getElementById('userModal')).show();
+  });
+
+  // 保存用户
+  document.getElementById('btnSaveUser').addEventListener('click', async function() {
+    var username = document.getElementById('userUsername').value.trim();
+    var password = document.getElementById('userPassword').value.trim();
+    var role = document.getElementById('userRole').value;
+    if (!username || !password) {
+      showToast('账号和密码不能为空', false);
+      return;
+    }
+    if (password.length < 6) {
+      showToast('密码至少6位', false);
+      return;
+    }
+    try {
+      var res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password, role})
+      });
+      var data = await res.json();
+      showToast(data.message, data.success);
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('userModal')).hide();
+        setTimeout(function() { location.reload(); }, 1000);
+      }
+    } catch(e) {
+      showToast('请求失败: ' + e.message, false);
+    }
+  });
+
+  // 用户列表操作（事件委托）
+  var table = document.getElementById('userTable');
+  table.addEventListener('click', async function(e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    var id = btn.getAttribute('data-id');
+
+    if (act === 'delete') {
+      if (!confirm('确认删除该用户？')) return;
+      try {
+        var res = await fetch('/api/users/' + id, {method: 'DELETE'});
+        var data = await res.json();
+        showToast(data.message, data.success);
+        if (data.success) setTimeout(function() { location.reload(); }, 800);
+      } catch(e) {
+        showToast('请求失败: ' + e.message, false);
+      }
+    } else if (act === 'reset') {
+      document.getElementById('resetUserId').value = id;
+      document.getElementById('resetPassword').value = '';
+      document.getElementById('resetPasswordConfirm').value = '';
+      new bootstrap.Modal(document.getElementById('resetModal')).show();
+    }
+  });
+
+  // 重置密码
+  document.getElementById('btnResetPassword').addEventListener('click', async function() {
+    var id = document.getElementById('resetUserId').value;
+    var pwd = document.getElementById('resetPassword').value.trim();
+    var confirm = document.getElementById('resetPasswordConfirm').value.trim();
+    if (!pwd || pwd.length < 6) {
+      showToast('密码至少6位', false);
+      return;
+    }
+    if (pwd !== confirm) {
+      showToast('两次密码不一致', false);
+      return;
+    }
+    try {
+      var res = await fetch('/api/users/' + id + '/reset-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pwd})
+      });
+      var data = await res.json();
+      showToast(data.message, data.success);
+      if (data.success) {
+        bootstrap.Modal.getInstance(document.getElementById('resetModal')).hide();
+      }
+    } catch(e) {
+      showToast('请求失败: ' + e.message, false);
+    }
+  });
+
+  // Toast
+  function showToast(msg, success) {
+    var el = document.getElementById('toast');
+    el.innerHTML = '<div class="toast show align-items-center text-white ' + (success ? 'bg-success' : 'bg-danger') + '" role="alert">'
+      + '<div class="d-flex"><div class="toast-body">' + msg + '</div>'
+      + '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-dismiss="toast"></button></div></div>';
+    setTimeout(function() { el.innerHTML = ''; }, 3000);
+  }
+  document.getElementById('toast').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-dismiss="toast"]');
+    if (btn) {
+      var toast = btn.closest('.toast');
+      if (toast) toast.remove();
+    }
+  });
+});
+</script>
+{% endblock %}

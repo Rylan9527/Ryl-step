@@ -1,13 +1,14 @@
 # -*- coding: utf8 -*-
-"""Flask 主程序：手动同步 + 自动管理 + 批量导入 + 历史记录"""
+"""Flask 主程序：登录认证 + 手动同步 + 自动管理 + 批量导入 + 历史记录"""
 import os
 import io
 import random
 import traceback
 from datetime import datetime
+from functools import wraps
 
 from flask import (Flask, render_template, request, jsonify, send_file,
-                   redirect, url_for, Response)
+                   redirect, url_for, Response, session, g)
 
 from models import database as db
 from services.crypto import encrypt_password, decrypt_password
@@ -15,23 +16,156 @@ from services.sync_wechat import sync_wechat_steps
 from services import scheduler as sched
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'zepp-life-step-manager-secret-key-2025')
 
 
-# 注册 Jinja 过滤器：账号脱敏
-@app.template_filter('desensitize')
-def desensitize_filter(username):
-    return db.desensitize(username)
+# ==================== 登录认证 ====================
+def login_required(f):
+    """登录验证装饰器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated
 
 
-@app.template_filter('mask_user')
-def mask_user_filter(username):
-    return db.desensitize(username)
+@app.context_processor
+def inject_current_user():
+    """向所有模板注入当前用户信息"""
+    current_user = None
+    if 'user_id' in session:
+        user = db.get_user_by_id(session['user_id'])
+        if user:
+            current_user = {'id': user['id'], 'username': user['username'], 'role': user['role']}
+    return {'current_user': current_user}
 
 
-# ==================== 原有路由（保持不变） ====================
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            return render_template('login.html', error='账号和密码不能为空')
+
+        user = db.get_user(username)
+        if user is None:
+            return render_template('login.html', error='账号或密码错误')
+
+        try:
+            decrypted = decrypt_password(user['password_encrypted'])
+            if decrypted == password:
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                next_url = request.args.get('next') or url_for('index')
+                return redirect(next_url)
+            else:
+                return render_template('login.html', error='账号或密码错误')
+        except Exception:
+            return render_template('login.html', error='账号或密码错误')
+
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+# ==================== 用户管理 ====================
+@app.route('/user/manage')
+@login_required
+def user_manage():
+    users = db.list_users()
+    return render_template('user_manage.html', active='users', users=users)
+
+
+@app.route('/user/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_pwd = request.form.get('current_password', '').strip()
+        new_pwd = request.form.get('new_password', '').strip()
+        confirm_pwd = request.form.get('confirm_password', '').strip()
+
+        user = db.get_user_by_id(session['user_id'])
+        try:
+            decrypted = decrypt_password(user['password_encrypted'])
+            if decrypted != current_pwd:
+                return render_template('change_password.html', error='当前密码错误')
+        except Exception:
+            return render_template('change_password.html', error='密码验证失败')
+
+        if not new_pwd or len(new_pwd) < 6:
+            return render_template('change_password.html', error='新密码至少6位')
+
+        if new_pwd != confirm_pwd:
+            return render_template('change_password.html', error='两次新密码不一致')
+
+        db.update_user_password(user['username'], encrypt_password(new_pwd))
+        return redirect(url_for('user_manage', msg='密码修改成功'))
+
+    return render_template('change_password.html', active='change_pwd')
+
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def api_add_user():
+    """创建新用户"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    role = data.get('role', 'user')
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "账号和密码不能为空"})
+
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "密码至少6位"})
+
+    existing = db.get_user(username)
+    if existing:
+        return jsonify({"success": False, "message": "账号已存在"})
+
+    db.add_user(username, encrypt_password(password), role)
+    return jsonify({"success": True, "message": "用户创建成功"})
+
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def api_delete_user(user_id):
+    """删除用户"""
+    if user_id == session['user_id']:
+        return jsonify({"success": False, "message": "不能删除自己"})
+    db.delete_user(user_id)
+    return jsonify({"success": True, "message": "用户已删除"})
+
+
+@app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+def api_reset_user_password(user_id):
+    """重置用户密码"""
+    data = request.get_json()
+    new_password = data.get('password', '').strip()
+    if not new_password or len(new_password) < 6:
+        return jsonify({"success": False, "message": "密码至少6位"})
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"})
+    db.update_user_password(user['username'], encrypt_password(new_password))
+    return jsonify({"success": True, "message": "密码重置成功"})
+
+
+# ==================== 原有路由（保持不变，添加登录验证） ====================
 @app.route('/')
+@login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', active='manual')
 
 
 @app.route('/api/status')
@@ -40,6 +174,7 @@ def api_status():
 
 
 @app.route('/api/sync-step', methods=['POST'])
+@login_required
 def sync_step():
     """原有手动同步接口，保留并增加历史记录"""
     data = request.get_json()
@@ -72,11 +207,13 @@ def sync_step():
 
 # ==================== 自动任务管理 ====================
 @app.route('/auto/manage')
+@login_required
 def auto_manage():
     return render_template('auto_manage.html', active='auto')
 
 
 @app.route('/api/auto/tasks')
+@login_required
 def api_list_tasks():
     tasks = db.list_auto_tasks()
     result = []
@@ -97,6 +234,7 @@ def api_list_tasks():
 
 
 @app.route('/api/auto/tasks', methods=['POST'])
+@login_required
 def api_add_task():
     data = request.get_json()
     user = data.get('username', '').strip()
@@ -137,6 +275,7 @@ def api_add_task():
 
 
 @app.route('/api/auto/tasks/<int:task_id>', methods=['PUT'])
+@login_required
 def api_update_task(task_id):
     data = request.get_json()
     task = db.get_auto_task(task_id)
@@ -168,6 +307,7 @@ def api_update_task(task_id):
 
 
 @app.route('/api/auto/tasks/<int:task_id>', methods=['DELETE'])
+@login_required
 def api_delete_task(task_id):
     sched.unschedule_task(task_id)
     db.delete_auto_task(task_id)
@@ -175,6 +315,7 @@ def api_delete_task(task_id):
 
 
 @app.route('/api/auto/tasks/<int:task_id>/toggle', methods=['POST'])
+@login_required
 def api_toggle_task(task_id):
     task = db.get_auto_task(task_id)
     if task is None:
@@ -187,6 +328,7 @@ def api_toggle_task(task_id):
 
 
 @app.route('/api/auto/tasks/<int:task_id>/run', methods=['POST'])
+@login_required
 def api_run_task_now(task_id):
     """立即执行一次自动任务"""
     task = db.get_auto_task(task_id)
@@ -212,6 +354,7 @@ def api_run_task_now(task_id):
 
 # ==================== 批量导入 ====================
 @app.route('/batch/import')
+@login_required
 def batch_import():
     return render_template('batch_import.html', active='batch')
 
@@ -225,6 +368,7 @@ def batch_template():
 
 
 @app.route('/batch/import', methods=['POST'])
+@login_required
 def batch_import_process():
     """处理上传的 CSV/Excel 文件"""
     file = request.files.get('file')
@@ -260,13 +404,13 @@ def batch_import_process():
             enable = row.get('enable', 1)
 
             if not user or not pwd:
-                errors.append(f"第{ i}行: 账号或密码为空")
+                errors.append(f"第{i}行: 账号或密码为空")
                 fail_count += 1
                 continue
             try:
                 steps_min = int(steps_min)
             except (TypeError, ValueError):
-                errors.append(f"第{ i}行: 最小步数格式错误")
+                errors.append(f"第{i}行: 最小步数格式错误")
                 fail_count += 1
                 continue
             if steps_max in (None, '', 0, 'nan'):
@@ -286,7 +430,7 @@ def batch_import_process():
             sched.reschedule_task(task_id)
             success_count += 1
         except Exception as e:
-            errors.append(f"第{ i}行: {e}")
+            errors.append(f"第{i}行: {e}")
             fail_count += 1
 
     msg = f"导入完成：成功 {success_count} 条，失败 {fail_count} 条"
@@ -301,6 +445,7 @@ def batch_import_process():
 
 # ==================== 历史记录 ====================
 @app.route('/history')
+@login_required
 def history():
     page = int(request.args.get('page', 1))
     username = request.args.get('username', '')
@@ -333,16 +478,37 @@ def history():
                            date_from=date_from, date_to=date_to)
 
 
+# ==================== Jinja 过滤器 ====================
+@app.template_filter('desensitize')
+def desensitize_filter(username):
+    return db.desensitize(username)
+
+
+@app.template_filter('mask_user')
+def mask_user_filter(username):
+    return db.desensitize(username)
+
+
 # ==================== 启动初始化 ====================
+def init_default_user():
+    """初始化默认管理员账号"""
+    user = db.get_user('Rylan')
+    if user is None:
+        db.add_user('Rylan', encrypt_password('8876678'), role='admin')
+        print("[INIT] 默认管理员 Rylan 已创建")
+
+
 def init_app():
     """初始化数据库与调度器"""
     db.init_db()
+    init_default_user()
     sched.init_scheduler()
 
 
 # 防止 Flask debug 模式 reloader 重复初始化调度器
 if __name__ == '__main__':
     db.init_db()
+    init_default_user()
     # 仅在主进程（非 reloader 子进程）启动调度器
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
         sched.init_scheduler()

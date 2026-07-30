@@ -1,0 +1,14 @@
+{
+  "USER": "9684223@qq.com",
+  "PWD": "Sqklrq8876678.",
+  "MIN_STEP": "18000",
+  "MAX_STEP": "25000",
+  "PUSH_PLUS_TOKEN": "",
+  "PUSH_PLUS_HOUR": "",
+  "PUSH_PLUS_MAX": "30",
+  "PUSH_WECHAT_WEBHOOK_KEY": "",
+  "TELEGRAM_BOT_TOKEN": "",
+  "TELEGRAM_CHAT_ID": "",
+  "SLEEP_GAP": "5",
+  "USE_CONCURRENT": "False"
+}
