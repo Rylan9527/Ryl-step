@@ -1,5 +1,9 @@
 # -*- coding: utf8 -*-
-"""定时调度服务：基于 APScheduler，启动时自动加载所有启用的自动任务"""
+"""定时调度服务：基于 APScheduler，启动时自动加载所有启用的自动任务
+
+调度器时区统一使用北京时间（Asia/Shanghai），确保 CronTrigger 的 hour/minute
+按北京时间解析，避免因容器/服务器本地时区差异导致执行时间不对。
+"""
 import os
 import random
 import logging
@@ -9,6 +13,9 @@ from apscheduler.triggers.cron import CronTrigger
 from models import database as db
 from services.sync_wechat import sync_wechat_steps
 from services.crypto import decrypt_password
+
+# 统一调度时区：北京时间
+_SCHEDULER_TZ = 'Asia/Shanghai'
 
 # 日志配置：输出到 sync.log
 logger = logging.getLogger('sync')
@@ -80,10 +87,10 @@ def schedule_task(task):
         except ValueError:
             logger.warning(f"任务 {task['id']} 执行时间配置无效: {h}")
             continue
-        trigger = CronTrigger(hour=hour, minute=task['exec_minute'])
+        trigger = CronTrigger(hour=hour, minute=task['exec_minute'], timezone=_SCHEDULER_TZ)
         scheduler.add_job(run_task, trigger, args=[task['id']],
                           id=_job_id(task['id'], hour), replace_existing=True)
-        logger.info(f"任务 {task['id']} 已调度: 每天 {hour:02d}:{task['exec_minute']:02d}")
+        logger.info(f"任务 {task['id']} 已调度: 每天北京时间 {hour:02d}:{task['exec_minute']:02d}")
 
 
 def unschedule_task(task_id):
@@ -108,7 +115,7 @@ def init_scheduler():
     global scheduler
     if scheduler is not None:
         return scheduler
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=_SCHEDULER_TZ)
     scheduler.start()
     tasks = db.list_auto_tasks()
     count = 0
@@ -116,7 +123,7 @@ def init_scheduler():
         if t['enabled']:
             schedule_task(t)
             count += 1
-    logger.info(f"调度器初始化完成，共加载 {count} 个启用任务")
+    logger.info(f"调度器初始化完成，共加载 {count} 个启用任务 (时区={_SCHEDULER_TZ})")
     return scheduler
 
 

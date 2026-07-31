@@ -16,7 +16,7 @@ from services.sync_wechat import sync_wechat_steps
 from services import scheduler as sched
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'zepp-life-step-manager-secret-key-2025')
+app.secret_key = os.environ.get('SECRET_KEY', 'zepp-life-step-manager-secret-key-2026')
 
 
 # ==================== 登录认证 ====================

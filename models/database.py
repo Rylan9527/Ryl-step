@@ -1,8 +1,27 @@
 # -*- coding: utf8 -*-
-"""数据库模块：accounts / auto_tasks / sync_history 三张表及 CRUD"""
+"""数据库模块：accounts / auto_tasks / sync_history 三张表及 CRUD
+
+时间统一策略：所有写入数据库的时间字段（created_at / sync_time / last_sync_time 等）
+一律使用北京时间（Asia/Shanghai），语义明确，避免 UTC/CURRENT_TIMESTAMP 造成的 8 小时偏差。
+"""
 import sqlite3
 import os
 from datetime import datetime
+
+try:
+    import pytz
+    _BJ_TZ = pytz.timezone('Asia/Shanghai')
+except ImportError:
+    # 兜底：若未安装 pytz，用系统本地时间（生产环境应确保 pytz 可用）
+    _BJ_TZ = None
+
+
+def now_bj_str():
+    """统一生成北京时间字符串，格式：YYYY-MM-DD HH:MM:SS"""
+    if _BJ_TZ is not None:
+        return datetime.now().astimezone(_BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
 DB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'mimotion.db')
 
@@ -23,7 +42,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password_encrypted TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT
     );
     CREATE TABLE IF NOT EXISTS auto_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,14 +62,14 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         password_encrypted TEXT NOT NULL,
         role TEXT DEFAULT 'user',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT
     );
     CREATE TABLE IF NOT EXISTS sync_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER,
         username TEXT,
         steps INTEGER,
-        sync_time TEXT DEFAULT CURRENT_TIMESTAMP,
+        sync_time TEXT,
         status TEXT,
         error_msg TEXT,
         sync_type TEXT
@@ -71,8 +90,8 @@ def add_account(username, encrypted_pwd):
         conn.commit()
         account_id = existing['id']
     else:
-        cur.execute("INSERT INTO accounts(username, password_encrypted) VALUES(?,?)",
-                    (username, encrypted_pwd))
+        cur.execute("INSERT INTO accounts(username, password_encrypted, created_at) VALUES(?,?,?)",
+                    (username, encrypted_pwd, now_bj_str()))
         conn.commit()
         account_id = cur.lastrowid
     conn.close()
@@ -158,7 +177,7 @@ def set_auto_task_enabled(task_id, enabled):
 def update_auto_task_status(task_id, status):
     conn = get_conn()
     conn.execute("UPDATE auto_tasks SET last_sync_status=?, last_sync_time=? WHERE id=?",
-                 (status, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), task_id))
+                 (status, now_bj_str(), task_id))
     conn.commit()
     conn.close()
 
@@ -168,7 +187,7 @@ def add_sync_history(account_id, username, steps, status, error_msg, sync_type):
     conn = get_conn()
     conn.execute("""INSERT INTO sync_history(account_id, username, steps, sync_time, status, error_msg, sync_type)
                     VALUES(?,?,?,?,?,?,?)""",
-                 (account_id, username, steps, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                 (account_id, username, steps, now_bj_str(),
                   status, error_msg, sync_type))
     conn.commit()
     conn.close()
@@ -211,8 +230,8 @@ def add_user(username, encrypted_pwd, role='user'):
         conn.commit()
         user_id = existing['id']
     else:
-        cur.execute("INSERT INTO users(username, password_encrypted, role) VALUES(?,?,?)",
-                    (username, encrypted_pwd, role))
+        cur.execute("INSERT INTO users(username, password_encrypted, role, created_at) VALUES(?,?,?,?)",
+                    (username, encrypted_pwd, role, now_bj_str()))
         conn.commit()
         user_id = cur.lastrowid
     conn.close()
