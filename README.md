@@ -1,19 +1,11 @@
-# mimotion
 
-![ 刷步数](https://github.com/TonyJiangWJ/mimotion/actions/workflows/run.yml/badge.svg)
-[![GitHub forks](https://img.shields.io/github/forks/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/forks)
-[![GitHub stars](https://img.shields.io/github/stars/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/issues)
 
 ## 小米运动自动刷步数（支持邮箱登录）
 
 - 小米运动自动刷步数，小米运动APP现已改名 `Zepp Life`，为方便说明，后面还是称其为小米运动。但下载注册时请搜索 `Zepp Life`。
 - 注册账号后建议先去以下网站测试自己的账号刷步数是否正常（注意这些网站只是网络上收集的，不保证安全和有效性）：
-    - https://steps.hubp.de/ 提示密码错误时可以多试几次 或者切换网络
-    - https://bs.yanwan.store/run4/ 验证码001或998
 - 如无法刷步数同步到支付宝等，建议重新注册一个新的。
 
-### 如果觉得好用，请给一个免费的[star](https://github.com/TonyJiangWJ/mimotion/)吧
 
 ## Github Actions 部署指南
 
@@ -25,19 +17,19 @@
   创建个人token，建议使用Fine-grained tokens，避免token泄露导致不必要的麻烦。
 - 填写token的名称，用于自己区别干嘛用的。
 - 选择token有效期，最大时长为1年。一年后需要重新续期或重建，唯一缺点
-- `Repository access` 选择 `Only select repositories` 勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
-- 点击 `Repository permissions` 展开菜单，并勾选以下四个权限即可，其他的可以不勾选
-    - `Actions` Access: `Read and write` 用于获取Actions的权限
-    - `Contents` Access: `Read and write` 用于更新定时任务和日志文件的权限
-    - `Metadata` Access: `Read-only` 这个自带的必选
-    - `Workflows` Access: `Read and write` 获取用于更新 `.github/workflow` 下文件的权限
+- `仓库访问权限`选择`仅选择特定仓库`勾选自己fork后的仓库，下拉可搜索：输入 mimotion 进行检索
+-点击`仓库权限`展开菜单，并勾选以下四个权限即可，其他的可以不勾选
+    `权限：`读写`用于获取操作的权限
+    - `内容`权限：`读写`用于更新定时任务和日志文件的权限
+    - `元数据`权限：`只读`这是系统自带的必选权限
+    - `工作流`访问权限：`读写`获取用于更新`.github/workflow`下文件的权限
 
 #### 你也可以创建更大权限的不限时token
 
 - 建议使用上面的小权限token，这个token无法指定某一个仓库的权限，也就是token一旦泄露将有可能导致其他人直接自由访问和修改你的所有仓库代码
 - 前往[https://github.com/settings/tokens/new](https://github.com/settings/tokens/new)创建
 - 填写token名称，选择有效期
-- `Select scopes` 勾选 `repo` 和 `workflow` 即可
+- `选择作用域`勾选`仓库``工作流`即可
 
 #### 创建完毕后点击最底下的 `Generate token` 即可生成token，复制token并自己保存一下以备后续使用，关闭当前页面后将无法再看到它。
 
